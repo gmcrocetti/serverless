@@ -727,5 +727,80 @@ describe('AwsCompileSNSEvents', () => {
           .Topic1ToFirstDLQPolicy.Type
       ).to.equal('AWS::SQS::QueuePolicy');
     });
+
+    it('should subscribe to topic with DeliveryPolicy when sns topic already exists', () => {
+      awsCompileSNSEvents.serverless.service.functions = {
+        first: {
+          events: [
+            {
+              sns: {
+                arn: 'arn:aws:foo',
+                topicName: 'Foo',
+                deliveryPolicy: {
+                  healthyRetry: {
+                    minDelayTarget: 10,
+                  },
+                },
+              },
+            },
+          ],
+        },
+      };
+
+      awsCompileSNSEvents.compileSNSEvents();
+
+      expect(
+        Object.keys(
+          awsCompileSNSEvents.serverless.service.provider.compiledCloudFormationTemplate.Resources
+        )
+      ).to.have.length(2);
+      expect(
+        awsCompileSNSEvents.serverless.service.provider.compiledCloudFormationTemplate.Resources
+          .FirstSnsSubscriptionFoo.Type
+      ).to.equal('AWS::SNS::Subscription');
+      expect(
+        awsCompileSNSEvents.serverless.service.provider.compiledCloudFormationTemplate.Resources
+          .FirstSnsSubscriptionFoo.Properties.DeliveryPolicy
+      ).to.eql({ healthyRetry: { minDelayTarget: 10 } });
+    });
+
+    it('should subscribe to new topic with DeliveryPolicy when sns topic is created', () => {
+      awsCompileSNSEvents.serverless.service.functions = {
+        first: {
+          events: [
+            {
+              sns: {
+                topicName: 'Topic 1',
+                displayName: 'Display name for topic 1',
+                deliveryPolicy: {
+                  healthyRetry: {
+                    minDelayTarget: 10,
+                  },
+                },
+              },
+            },
+          ],
+        },
+      };
+
+      awsCompileSNSEvents.compileSNSEvents();
+
+      expect(
+        awsCompileSNSEvents.serverless.service.provider.compiledCloudFormationTemplate.Resources
+          .SNSTopicTopic1.Type
+      ).to.equal('AWS::SNS::Topic');
+      expect(
+        awsCompileSNSEvents.serverless.service.provider.compiledCloudFormationTemplate.Resources
+          .FirstLambdaPermissionTopic1SNS.Type
+      ).to.equal('AWS::Lambda::Permission');
+      expect(
+        awsCompileSNSEvents.serverless.service.provider.compiledCloudFormationTemplate.Resources
+          .FirstSnsSubscriptionTopic1.Type
+      ).to.equal('AWS::SNS::Subscription');
+      expect(
+        awsCompileSNSEvents.serverless.service.provider.compiledCloudFormationTemplate.Resources
+          .FirstSnsSubscriptionTopic1.Properties.DeliveryPolicy
+      ).to.eql({ healthyRetry: { minDelayTarget: 10 } });
+    });
   });
 });
